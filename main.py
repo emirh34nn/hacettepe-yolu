@@ -5,11 +5,11 @@ import random
 import json
 import base64
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, date
 from io import BytesIO
 from PIL import Image
 
-# --- DOSYA YÖNETİMİ ---
+# --- DOSYA VE VERİ YÖNETİMİ ---
 FILES = {
     "sorular": "database.json", 
     "denemeler": "denemeler.json", 
@@ -31,9 +31,9 @@ def save_json(data, file):
 for key, file in FILES.items():
     if key not in st.session_state: st.session_state[key] = load_json(file)
 
-st.set_page_config(page_title="HACETTEPE YOLU v3.5.7", layout="wide")
+st.set_page_config(page_title="HACETTEPE YOLU v3.5.9", layout="wide")
 
-# --- GECE MODU ---
+# --- GECE MODU VE GÖRSEL STİLLER ---
 if 'dark_mode' not in st.session_state: st.session_state.dark_mode = False
 bg, txt, card = ("#121212", "#E0E0E0", "#1E1E1E") if st.session_state.dark_mode else ("#F8FAFC", "#1E293B", "#FFFFFF")
 
@@ -44,8 +44,8 @@ st.markdown(f"""<style>
     .game-box {{ background-color: {card}; padding: 25px; border-radius: 15px; border: 2px dashed #3B82F6; text-align: center; }}
     </style>""", unsafe_allow_html=True)
 
-# --- MENÜ ---
-st.sidebar.title("🕊️ HAC v3.5.7")
+# --- YAN MENÜ ---
+st.sidebar.title("🕊️ HAC v3.5.9")
 if st.sidebar.button("🌙/☀️ Gece Modu"):
     st.session_state.dark_mode = not st.session_state.dark_mode
     st.rerun()
@@ -66,27 +66,18 @@ if choice == "📊 Dashboard":
     if st.session_state.denemeler:
         col3.metric("Son Net", f"{st.session_state.denemeler[-1]['toplam_net']:.2f}")
 
-    st.divider()
-    if len(st.session_state.gunluk) >= 3:
-        st.subheader("💡 Haftalık Özet")
-        df_g = pd.DataFrame(st.session_state.gunluk)
-        st.success(f"🔥 Bu hafta toplam **{df_g['saat'].sum()} saat** çalıştın. Beytepe seni bekliyor!")
-
-# --- 2. YKS NET ANALİZÖRÜ ---
+# --- 2. YKS NET ANALİZÖRÜ (v3.5.7 Stabil Yapı) ---
 elif choice == "📈 YKS Net Analizörü":
     st.header("📊 Deneme Net Hesaplama & Takip")
     t1, t2 = st.tabs(["📥 Yeni Deneme Gir", "📈 Gelişim Grafiği"])
-    
     with t1:
         with st.form("net_hesapla"):
             yayin = st.text_input("Yayın Adı", placeholder="Örn: 3D, Bilgi Sarmal")
             tur = st.radio("Sınav Türü", ["TYT", "AYT"], horizontal=True)
             dersler = ["Türkçe", "Sosyal", "Matematik", "Fen"] if tur == "TYT" else ["Matematik", "Edebiyat", "Tarih-1", "Coğrafya-1"]
-            
             c1, c2, c3, c4 = st.columns(4)
             cols = [c1, c2, c3, c4]
             sonuclar = {}; toplam_net = 0
-            
             for i, ders in enumerate(dersler):
                 with cols[i]:
                     st.write(f"**{ders}**")
@@ -94,16 +85,13 @@ elif choice == "📈 YKS Net Analizörü":
                     y = st.number_input("Y", 0, 40, key=f"y_{ders}")
                     n = d - (y * 0.25)
                     sonuclar[ders] = n; toplam_net += n
-            
             if st.form_submit_button("Hesapla ve Kaydet"):
                 st.session_state.denemeler.append({"tarih": datetime.now().strftime("%d/%m/%Y"), "yayin": yayin, "tur": tur, "toplam_net": toplam_net, "detay": sonuclar})
                 save_json(st.session_state.denemeler, FILES["denemeler"]); st.success(f"Netin: {toplam_net:.2f}"); st.rerun()
-
     with t2:
         if st.session_state.denemeler:
             df = pd.DataFrame(st.session_state.denemeler)
             st.plotly_chart(px.line(df, x="tarih", y="toplam_net", color="tur", markers=True))
-            st.dataframe(df[['tarih', 'yayin', 'tur', 'toplam_net']])
 
 # --- 3. EDEBİYAT OYUNU ---
 elif choice == "🎭 Edebiyat Oyunu":
@@ -130,103 +118,71 @@ elif choice == "🎭 Edebiyat Oyunu":
                 if ans == st.session_state.game['d']: st.balloons(); st.success("Doğru!"); del st.session_state.game; st.button("Sıradaki")
                 else: st.error(f"Yanlış! Cevap: {st.session_state.game['d']}"); del st.session_state.game
 
-# --- 4. GÜN SONU KRİTİĞİ ---
+# --- 4. GÜN SONU KRİTİĞİ (YENİ ALGORİTMA) ---
 elif choice == "🌙 Gün Sonu Kritiği":
-    # Sistem tarihini al ve Türkçe formatta göster
     bugun = date.today()
     aylar_tr = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
     tarih_str = f"{bugun.day} {aylar_tr[bugun.month]} {bugun.year}"
     
     st.header("🌙 Gün Sonu Değerlendirmesi")
-    st.info(f"📅 Bugün: **{tarih_str}**")
+    st.info(f"📅 Sistem Tarihi: **{tarih_str}**")
 
-    col1, col2 = st.columns([1, 1])
-    
+    col1, col2 = st.columns(2)
     with col1:
         with st.form("gunluk_form", clear_on_submit=True):
-            st.subheader("Günü Mühürle")
-            # Tarih seçiciyi bugün ile sınırla (Gelecek seçilemez)
-            secilen_tarih = st.date_input("Kritik Tarihi", value=bugun, max_value=bugun)
-            
+            secilen_tarih = st.date_input("Kritik Tarihi", value=bugun, max_value=bugun) # Gelecek engelli
             saat = st.number_input("Bugün Kaç Saat Çalıştın?", 0.0, 24.0, 5.0)
             verim = st.slider("Verim Puanın (1-10)", 1, 10, 7)
-            
             st.write("---")
             st.write("🎯 **EA Branş Dağılımı (Saat)**")
             c_ea1, c_ea2 = st.columns(2)
             mat_s = c_ea1.number_input("Matematik", 0.0, 15.0, 0.0)
             edeb_s = c_ea2.number_input("Edebiyat", 0.0, 15.0, 0.0)
-            sos_s = c_ea1.number_input("Tarih/Coğ", 0.0, 15.0, 0.0)
-            
-            notlar = st.text_area("Günün Özeti / Öğrenilen Önemli Bilgi")
+            notlar = st.text_area("Günün Özeti")
             
             if st.form_submit_button("Sisteme İşle"):
-                # Gelecek tarih kontrolü (Garanti olması için kod seviyesinde de kontrol)
-                if secilen_tarih > bugun:
-                    st.error("⚠️ Henüz yaşanmamış bir günü mühürleyemezsin kanka! Geleceğe kayıt yok.")
-                else:
-                    yeni_kayit = {
-                        "tarih": str(secilen_tarih),
-                        "saat": saat,
-                        "verim": verim,
-                        "dagilim": {"Mat": mat_s, "Ed": edeb_s, "Sos": sos_s},
-                        "not": notlar
-                    }
-                    # Aynı tarihe ait eski kaydı silip yenisini ekle
-                    st.session_state.gunluk = [k for k in st.session_state.gunluk if k['tarih'] != str(secilen_tarih)]
-                    st.session_state.gunluk.append(yeni_kayit)
-                    save_json(st.session_state.gunluk, FILES["gunluk"])
-                    st.balloons()
-                    st.success(f"✅ {secilen_tarih} tarihi başarıyla mühürlendi!")
-                    st.rerun()
-
+                yeni_kayit = {"tarih": str(secilen_tarih), "saat": saat, "verim": verim, "dagilim": {"Mat": mat_s, "Ed": edeb_s}, "not": notlar}
+                st.session_state.gunluk = [k for k in st.session_state.gunluk if k['tarih'] != str(secilen_tarih)]
+                st.session_state.gunluk.append(yeni_kayit)
+                save_json(st.session_state.gunluk, FILES["gunluk"])
+                st.balloons(); st.success("Mühürlendi!"); st.rerun()
     with col2:
-        st.subheader("📅 Geçmiş Kayıtların")
         if st.session_state.gunluk:
-            # Kayıtları tarihe göre ters sırala
-            df_gecmis = pd.DataFrame(st.session_state.gunluk).sort_values(by="tarih", ascending=False)
-            
-            for _, row in df_gecmis.head(10).iterrows():
-                with st.expander(f"📌 {row['tarih']} | {row['saat']} Saat | Verim: {row['verim']}"):
-                    st.write(f"**Not:** {row.get('not', '-')}")
-                    d = row.get('dagilim', {})
-                    st.write(f"📊 Mat: {d.get('Mat', 0)}s | Ed: {d.get('Ed', 0)}s | Sos: {d.get('Sos', 0)}s")
-        else:
-            st.write("Henüz bir geçmiş kaydı bulunmuyor.")
+            df_g = pd.DataFrame(st.session_state.gunluk).sort_values(by="tarih", ascending=False)
+            st.table(df_g.head(5))
 
-# --- 5. SORU EKLE ---
+# --- DİĞER BÖLÜMLER (EKSİKSİZ) ---
 elif choice == "📥 Soru Ekle":
     st.header("📸 Soru Kaydı")
     with st.form("sr_e", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
-            tur = st.radio("Tür", ["TYT", "AYT"], horizontal=True)
+            tur = st.radio("Sınav", ["TYT", "AYT"], horizontal=True)
             ders = st.selectbox("Ders", ["Matematik", "Geometri", "Türkçe", "Edebiyat", "Tarih", "Coğrafya", "Felsefe-Din", "Fen"])
             yay = st.text_input("Yayın")
         with c2:
-            zor = st.slider("Zorluk", 1, 10, 5)
+            zor = st.slider("HAC Zorluk", 1, 10, 5)
             res = st.file_uploader("Görsel", type=["png","jpg","jpeg"])
             cvp = st.text_input("Cevap")
         if st.form_submit_button("Mühürle") and res:
-            img = Image.open(res).convert("RGB")
-            buf = BytesIO(); img.save(buf, format="JPEG", quality=50)
-            enc = base64.b64encode(buf.getvalue()).decode()
-            st.session_state.sorular.append({"id":random.randint(1,9999), "tur":tur, "ders":ders, "resim":enc, "cevap":cvp, "hac_puani":zor, "yayin":yay})
-            save_json(st.session_state.sorular, FILES["sorular"]); st.rerun()
+            try:
+                img = Image.open(res).convert("RGB")
+                buf = BytesIO(); img.save(buf, format="JPEG", quality=50)
+                enc = base64.b64encode(buf.getvalue()).decode()
+                st.session_state.sorular.append({"id":random.randint(1,9999), "tur":tur, "ders":ders, "resim":enc, "cevap":cvp, "hac_puani":zor, "yayin":yay})
+                save_json(st.session_state.sorular, FILES["sorular"]); st.success("Mühürlendi!"); st.rerun()
+            except: st.error("Hata!")
 
-# --- 6. SORU ARŞİVİ ---
 elif choice == "🔍 Soru Arşivi":
     st.header("🔍 Arşiv")
-    arama = st.text_input("Ders veya Yayın Ara...")
+    ara = st.text_input("Ders veya Yayın Ara...")
     for s in reversed(st.session_state.sorular):
-        if arama.lower() in s['ders'].lower() or arama.lower() in s.get('yayin','').lower():
+        if ara.lower() in s['ders'].lower() or ara.lower() in s.get('yayin','').lower():
             with st.expander(f"{s['tur']} {s['ders']} | {s.get('yayin','')}"):
                 st.image(f"data:image/png;base64,{s['resim']}")
-                st.write(f"Cevap: {s['cevap']}")
                 if st.button("Sil", key=f"ds_{s['id']}"):
                     st.session_state.sorular.remove(s); save_json(st.session_state.sorular, FILES["sorular"]); st.rerun()
 
-# --- 7. SÖZEL KARTLAR ---
 elif choice == "🗂️ Sözel Kartlar":
     st.header("🗂️ Kartlar")
     with st.form("kt_f", clear_on_submit=True):
@@ -240,28 +196,22 @@ elif choice == "🗂️ Sözel Kartlar":
         if st.button("Sil", key=f"ks_{k['id']}"):
             st.session_state.kartlar.remove(k); save_json(st.session_state.kartlar, FILES["kartlar"]); st.rerun()
 
-# --- 8. KRİTİK EKSİKLER ---
 elif choice == "🚨 Kritik Eksikler":
     st.header("🚨 Zor Sorular (8+)")
     for s in [i for i in st.session_state.sorular if int(i.get('hac_puani',0)) >= 8]:
         with st.expander(f"{s['ders']} | Zorluk: {s['hac_puani']}"):
             st.image(f"data:image/png;base64,{s['resim']}")
 
-# --- 9. KİTAP TAKİBİ ---
 elif choice == "📚 Kitap Takibi":
     st.header("📚 Kitap Takibi")
-    with st.form("kitap_ekle_f", clear_on_submit=True):
-        ad = st.text_input("Kitap Adı"); toplam = st.number_input("Toplam Sayfa", 1, 1000, 200)
-        if st.form_submit_button("Yeni Kitap Ekle"):
-            st.session_state.kitaplar.append({"id":random.randint(1,9999), "ad":ad, "toplam":toplam, "su_an":0})
+    with st.form("kit_e"):
+        ad = st.text_input("Kitap"); top = st.number_input("Sayfa", 1)
+        if st.form_submit_button("Ekle"):
+            st.session_state.kitaplar.append({"id":random.randint(1,9999), "ad":ad, "toplam":top, "su_an":0})
             save_json(st.session_state.kitaplar, FILES["kitaplar"]); st.rerun()
     st.divider()
     for i, k in enumerate(st.session_state.kitaplar):
-        yeni = st.slider(f"{k['ad']}", 0, k['toplam'], k['su_an'], key=f"sl_{k['id']}")
-        c1, c2 = st.columns(2)
-        if c1.button("Güncelle", key=f"gn_{k['id']}"):
+        yeni = st.slider(k['ad'], 0, k['toplam'], k['su_an'], key=f"sl_{k['id']}")
+        if st.button("Güncelle", key=f"gn_{k['id']}"):
             st.session_state.kitaplar[i]['su_an'] = yeni
             save_json(st.session_state.kitaplar, FILES["kitaplar"]); st.rerun()
-        if c2.button("Sil", key=f"ksil_{k['id']}"):
-            st.session_state.kitaplar.pop(i); save_json(st.session_state.kitaplar, FILES["kitaplar"]); st.rerun()
-
