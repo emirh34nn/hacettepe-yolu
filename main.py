@@ -94,9 +94,10 @@ elif choice == "🌙 Gün Sonu Kritiği":
             st.table(pd.DataFrame(st.session_state.gunluk).sort_values("tarih", ascending=False).head(7))
 
 # --- 3. SORU EKLE (GÜNCEL) ---
+# --- 📥 SORU EKLE (HATA DÜZELTİLMİŞ) ---
 elif choice == "📥 Soru Ekle":
     st.header("📸 Yeni Soru Kaydı")
-    with st.form("s_e", clear_on_submit=True):
+    with st.form("yukle_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
             tur = st.radio("Sınav Türü", ["TYT", "AYT"], horizontal=True)
@@ -105,14 +106,33 @@ elif choice == "📥 Soru Ekle":
             ders = st.selectbox("Ders", d_list); yayin = st.text_input("Yayın")
         with c2:
             zor = st.slider("HAC Zorluk", 1, 10, 5)
-            cevap = st.text_input("Cevap (Şık/Metin)"); res = st.file_uploader("Soru Görseli")
+            cevap = st.text_input("Cevap (Şık/Metin)")
+            res = st.file_uploader("Soru Görseli", type=["png", "jpg", "jpeg"]) # Sadece resim formatları
+        
         notum = st.text_area("Analiz Notu")
-        if st.form_submit_button("Sisteme Mühürle") and res:
-            img = Image.open(res).convert("RGB")
-            buf = BytesIO(); img.save(buf, format="JPEG", quality=50)
-            enc = base64.b64encode(buf.getvalue()).decode()
-            st.session_state.sorular.append({"id": random.randint(1,9999), "tur": tur, "ders": ders, "yayin": yayin, "resim": enc, "cevap": cevap, "hac_puani": zor, "not": notum})
-            save_json(st.session_state.sorular, FILES["sorular"]); st.success("Mühürlendi!"); st.rerun()
+        submit = st.form_submit_button("Sisteme Mühürle")
+        
+        if submit:
+            if res is not None: # Resim yüklenmiş mi kontrol et
+                try:
+                    img = Image.open(res).convert("RGB")
+                    buf = BytesIO()
+                    img.save(buf, format="JPEG", quality=50)
+                    enc = base64.b64encode(buf.getvalue()).decode()
+                    
+                    st.session_state.sorular.append({
+                        "id": random.randint(1,9999), 
+                        "tur": tur, "ders": ders, "yayin": yayin, 
+                        "resim": enc, "cevap": cevap, 
+                        "hac_puani": zor, "not": notum
+                    })
+                    save_json(st.session_state.sorular, FILES["sorular"])
+                    st.success(f"Mühürlendi! {ders} arşive eklendi.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Resim işlenirken hata oluştu: {e}")
+            else:
+                st.warning("⚠️ Lütfen önce bir soru fotoğrafı yükle kanka!")
 
 # --- 4. SORU ARŞİVİ (GERİ GELDİ) ---
 elif choice == "🔍 Soru Arşivi":
@@ -182,3 +202,4 @@ elif choice == "📚 Kitap İlerleme":
         if st.button("Güncelle", key=f"up_{kit['id']}"):
             st.session_state.kitaplar[i]['su_an'] = yeni
             save_json(st.session_state.kitaplar, FILES["kitaplar"]); st.rerun()
+
