@@ -132,15 +132,67 @@ elif choice == "🎭 Edebiyat Oyunu":
 
 # --- 4. GÜN SONU KRİTİĞİ ---
 elif choice == "🌙 Gün Sonu Kritiği":
+    # Sistem tarihini al ve Türkçe formatta göster
+    bugun = date.today()
+    aylar_tr = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    tarih_str = f"{bugun.day} {aylar_tr[bugun.month]} {bugun.year}"
+    
     st.header("🌙 Gün Sonu Değerlendirmesi")
-    with st.form("gn_f"):
-        t = st.date_input("Tarih", datetime.now())
-        s = st.number_input("Saat", 0.0, 24.0, 5.0)
-        v = st.slider("Verim", 1, 10, 7)
-        if st.form_submit_button("Mühürle"):
-            st.session_state.gunluk.append({"tarih":str(t), "saat":s, "verim":v})
-            save_json(st.session_state.gunluk, FILES["gunluk"]); st.rerun()
-    if st.session_state.gunluk: st.table(pd.DataFrame(st.session_state.gunluk).tail(5))
+    st.info(f"📅 Bugün: **{tarih_str}**")
+
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        with st.form("gunluk_form", clear_on_submit=True):
+            st.subheader("Günü Mühürle")
+            # Tarih seçiciyi bugün ile sınırla (Gelecek seçilemez)
+            secilen_tarih = st.date_input("Kritik Tarihi", value=bugun, max_value=bugun)
+            
+            saat = st.number_input("Bugün Kaç Saat Çalıştın?", 0.0, 24.0, 5.0)
+            verim = st.slider("Verim Puanın (1-10)", 1, 10, 7)
+            
+            st.write("---")
+            st.write("🎯 **EA Branş Dağılımı (Saat)**")
+            c_ea1, c_ea2 = st.columns(2)
+            mat_s = c_ea1.number_input("Matematik", 0.0, 15.0, 0.0)
+            edeb_s = c_ea2.number_input("Edebiyat", 0.0, 15.0, 0.0)
+            sos_s = c_ea1.number_input("Tarih/Coğ", 0.0, 15.0, 0.0)
+            
+            notlar = st.text_area("Günün Özeti / Öğrenilen Önemli Bilgi")
+            
+            if st.form_submit_button("Sisteme İşle"):
+                # Gelecek tarih kontrolü (Garanti olması için kod seviyesinde de kontrol)
+                if secilen_tarih > bugun:
+                    st.error("⚠️ Henüz yaşanmamış bir günü mühürleyemezsin kanka! Geleceğe kayıt yok.")
+                else:
+                    yeni_kayit = {
+                        "tarih": str(secilen_tarih),
+                        "saat": saat,
+                        "verim": verim,
+                        "dagilim": {"Mat": mat_s, "Ed": edeb_s, "Sos": sos_s},
+                        "not": notlar
+                    }
+                    # Aynı tarihe ait eski kaydı silip yenisini ekle
+                    st.session_state.gunluk = [k for k in st.session_state.gunluk if k['tarih'] != str(secilen_tarih)]
+                    st.session_state.gunluk.append(yeni_kayit)
+                    save_json(st.session_state.gunluk, FILES["gunluk"])
+                    st.balloons()
+                    st.success(f"✅ {secilen_tarih} tarihi başarıyla mühürlendi!")
+                    st.rerun()
+
+    with col2:
+        st.subheader("📅 Geçmiş Kayıtların")
+        if st.session_state.gunluk:
+            # Kayıtları tarihe göre ters sırala
+            df_gecmis = pd.DataFrame(st.session_state.gunluk).sort_values(by="tarih", ascending=False)
+            
+            for _, row in df_gecmis.head(10).iterrows():
+                with st.expander(f"📌 {row['tarih']} | {row['saat']} Saat | Verim: {row['verim']}"):
+                    st.write(f"**Not:** {row.get('not', '-')}")
+                    d = row.get('dagilim', {})
+                    st.write(f"📊 Mat: {d.get('Mat', 0)}s | Ed: {d.get('Ed', 0)}s | Sos: {d.get('Sos', 0)}s")
+        else:
+            st.write("Henüz bir geçmiş kaydı bulunmuyor.")
 
 # --- 5. SORU EKLE ---
 elif choice == "📥 Soru Ekle":
@@ -212,3 +264,4 @@ elif choice == "📚 Kitap Takibi":
             save_json(st.session_state.kitaplar, FILES["kitaplar"]); st.rerun()
         if c2.button("Sil", key=f"ksil_{k['id']}"):
             st.session_state.kitaplar.pop(i); save_json(st.session_state.kitaplar, FILES["kitaplar"]); st.rerun()
+
